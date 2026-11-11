@@ -47,10 +47,8 @@ done
 if [ ${#missing[@]} -gt 0 ]; then
   echo
   echo "足りないコマンド: ${missing[*]}"
-  echo "  Ubuntu / Debian: sudo apt install tmux git neovim ripgrep fzf glow cargo python3"
-  echo "  nvim が 0.10 より古い: https://github.com/neovim/neovim/releases"
-  echo "  glow が apt にない: $here/install-glow.sh"
-  echo "  mdserve: cargo install mdserve（ブラウザ表示用。なくても mdview は glow で表示する）"
+  echo "  tmux git ripgrep fzf python3: sudo apt install tmux git ripgrep fzf python3"
+  echo "  nvim（0.10 以上）・glow・mdserve: $here/install-tools.sh（sudo 不要。mdserve はブラウザ表示用で、なくても mdview は glow で表示する）"
 fi
 echo
 echo "済み。新しいシェルを開き、tmux の中で Prefix + I でプラグインを入れる"

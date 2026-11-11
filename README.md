@@ -27,27 +27,23 @@ tmux・Neovim（LazyVim）・ターミナル用の小さなツール群の設定
 
 ```bash
 sudo apt update
-sudo apt install tmux neovim ripgrep fzf glow cargo
-cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
+sudo apt install tmux git ripgrep fzf python3
 ```
 
-- 必要なもの: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。
-- `mdserve` は、ブラウザで見るときだけ要ります。ないと mdview はターミナル内表示になります。
-- `glow` が apt にないときは、`install-glow.sh` が配布ページの実行ファイルを `~/.local/bin` に置きます（`sudo` 不要。`~/.local/bin` は `install.sh` のあと PATH に入ります）。
-
-  ```bash
-  ~/dotfiles/install-glow.sh
-  ```
-
-  CPU（x86_64・arm64 など）は自動で選びます。版は `GLOW_VERSION=3.0.0 ~/dotfiles/install-glow.sh` のように変えられます。取れなかったときは、[配布ページ](https://github.com/charmbracelet/glow/releases) から自分の環境に合う `.tar.gz` を手で取って、中の `glow` を `~/.local/bin` に置いてください。
+- 必要なもの: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。`mdserve` は、ブラウザで見るときだけ要ります（ないと mdview はターミナル内表示になります）。
+- 上の 5 つは apt のもので足ります（Ubuntu 22.04 でも動きます）。
+- **nvim・glow・mdserve** は、apt にないか、古いことがあります（Ubuntu 22.04 の nvim は 0.6 です）。それらは、次の 2 で dotfiles を取ったあと、`install-tools.sh` が公式の配布物から `~/.local` に入れます（`sudo` 不要・Rust 不要）。
 - `sudo` が使えないときは、各コマンドの配布物をホーム配下に置いて、PATH を通します。
 
 ### 2. サーバ: dotfiles を入れる
 
 ```bash
 git clone https://github.com/trtnk/dotfiles ~/dotfiles
+~/dotfiles/install-tools.sh    # nvim・glow・mdserve が足りない／古いときだけ。足りていれば「済み」と出て飛ばす
 ~/dotfiles/install.sh
 ```
+
+`install-tools.sh` は、nvim（0.10 以上）・glow・mdserve を、すでに足りているものは飛ばして、足りないものだけ入れます。CPU（x86_64・arm64）は自動で選びます。版は `NVIM_VERSION` `GLOW_VERSION` `MDSERVE_VERSION` で変えられます。取れなかったときは、各プロジェクトの配布ページから、実行ファイルを手で `~/.local/bin` に置いてください。
 
 `install.sh` はホームへシンボリックリンクを張るだけです。
 
@@ -128,7 +124,7 @@ tmux の中で `Ctrl-Space` を押して離し、続けて `m` を押します�
 | 症状 | 見るところ |
 |---|---|
 | `install.sh` が `mdserve` を足りないと言う | 古いシェルで PATH が通っていないだけのことがある。新しいシェルで `command -v mdserve` |
-| `cargo install` のあと `~/.cargo/bin` の PATH の警告が出る | 新しいシェル（つなぎ直し）で解消する。`bash/init.sh` が自動で足す |
+| `mdserve` `nvim` `glow` が「ない」「古い」と出る | `~/dotfiles/install-tools.sh`。入れ先は `~/.local/bin`。新しいシェルで PATH に入る |
 | ブラウザが開かない・接続できない | 3 の転送を足したあと、つなぎ直したか。`ssh -G` で設定が読めているか |
 | クリップボードに URL が入らない | 手元のターミナルが OSC 52 に対応しているか。画面に出た URL を手で打ってもよい |
 | `Ctrl-Space` に反応しない | 手元の日本語入力などが、そのキーを先に取っていないか |
