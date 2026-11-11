@@ -33,21 +33,13 @@ cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
 
 - 必要なもの: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。
 - `mdserve` は、ブラウザで見るときだけ要ります。ないと mdview はターミナル内表示になります。
-- `glow` が apt にないときは、配布ページの実行ファイルを `~/.local/bin` に置きます（`sudo` 不要。`~/.local/bin` は `install.sh` のあと PATH に入ります）。
+- `glow` が apt にないときは、`install-glow.sh` が配布ページの実行ファイルを `~/.local/bin` に置きます（`sudo` 不要。`~/.local/bin` は `install.sh` のあと PATH に入ります）。
 
   ```bash
-  uname -m    # x86_64 ならそのまま、aarch64 なら下の x86_64 を arm64 に読み替える
-  cd "$(mktemp -d)"
-  url=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep -o 'https[^"]*Linux_x86_64\.tar\.gz"' | tr -d '"')
-  echo "$url"    # glow_<版>_Linux_x86_64.tar.gz の住所が出ること
-  curl -fsSLo glow.tar.gz "$url"
-  tar -xzf glow.tar.gz
-  mkdir -p ~/.local/bin
-  install -m 755 "$(find . -name glow -type f | head -n1)" ~/.local/bin/glow
-  ~/.local/bin/glow --version
+  ~/dotfiles/install-glow.sh
   ```
 
-  `echo "$url"` が空なら、GitHub の API が混んでいる（認証なしは 1 時間 60 回まで）か、名前の付け方が変わっています。[配布ページ](https://github.com/charmbracelet/glow/releases) を開いて、自分の環境（`uname -m`）に合う `.tar.gz` を手で取ってください。
+  CPU（x86_64・arm64 など）は自動で選びます。版は `GLOW_VERSION=3.0.0 ~/dotfiles/install-glow.sh` のように変えられます。取れなかったときは、[配布ページ](https://github.com/charmbracelet/glow/releases) から自分の環境に合う `.tar.gz` を手で取って、中の `glow` を `~/.local/bin` に置いてください。
 - `sudo` が使えないときは、各コマンドの配布物をホーム配下に置いて、PATH を通します。
 
 ### 2. サーバ: dotfiles を入れる

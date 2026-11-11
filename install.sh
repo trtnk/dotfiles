@@ -49,7 +49,7 @@ if [ ${#missing[@]} -gt 0 ]; then
   echo "足りないコマンド: ${missing[*]}"
   echo "  Ubuntu / Debian: sudo apt install tmux git neovim ripgrep fzf glow cargo python3"
   echo "  nvim が 0.10 より古い: https://github.com/neovim/neovim/releases"
-  echo "  glow が apt にない: https://github.com/charmbracelet/glow/releases"
+  echo "  glow が apt にない: $here/install-glow.sh"
   echo "  mdserve: cargo install mdserve（ブラウザ表示用。なくても mdview は glow で表示する）"
 fi
 echo
