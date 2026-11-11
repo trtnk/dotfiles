@@ -18,9 +18,11 @@ tail_lines=${APPROVALS_TAIL:-12}
 extra="${XDG_CONFIG_HOME:-$HOME/.config}/approvals/patterns"
 
 # 既定の文言（Claude Code・Codex・Copilot CLI などの承認画面）
-patterns='Do you want to (proceed|make|run|create|allow|use)
-Would you like to (run|make|apply|allow)
-^[[:space:]]*(❯|›|>)[[:space:]]*1\.[[:space:]]*(Yes|Allow|Approve)
+# 選択肢の行は、枠（│ ┃）の内側に描かれることがあり、↑↓でカーソルが 2. 以降へ動くと
+# 1. の前の ❯ も消える。だから行頭の枠とカーソルは「あってもなくてもよい」にしている。
+patterns='Do you want to (proceed|make|run|create|allow|use|edit|update|write|apply|overwrite|delete)
+Would you like to (run|make|apply|allow|edit|update)
+^[[:space:]│┃|]*(❯|›|>)?[[:space:]]*1\.[[:space:]]*(Yes|Allow|Approve)
 Allow (once|always)
 \[y/N\]|\[Y/n\]|\(y/n\)'
 
