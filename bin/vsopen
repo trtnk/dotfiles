@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# vsopen [パス]  SSH 先のフォルダ（またはファイル）を、手元の VS Code（Remote-SSH）で開くための住所を、手元のクリップボードへ送る
+#   パスの既定は今いるフォルダ。送った住所を、手元のブラウザのアドレス欄に貼ると VS Code が開く
+#   住所の形: vscode://vscode-remote/ssh-remote+<Host名>/<パス>
+#   Host 名は、手元の Windows の ~/.ssh/config（%UserProfile%\.ssh\config）の Host 名。
+#   サーバの hostname -s と違うときは、環境変数 VSOPEN_HOST に書く（~/.bashrc.local）
+set -u
+
+die() { echo "vsopen: $*" >&2; exit 1; }
+
+[ -n "${SSH_CONNECTION:-}" ] || die "SSH 先で使うものです（手元では VS Code を直接開けます）"
+
+host=${VSOPEN_HOST:-$(hostname -s)}
+case "$host" in ''|-*|*[!A-Za-z0-9._-]*) die "Host 名が不正です: $host（VSOPEN_HOST を確かめてください）" ;; esac
+
+target=${1:-$PWD}
+[ -e "$target" ] || die "パスがありません: $target"
+path=$(cd "$(dirname -- "$target")" && printf '%s/%s' "$PWD" "$(basename -- "$target")") || die "パスを解決できません: $target"
+# フォルダなら末尾の basename が余計に付くので、ディレクトリはそのまま絶対パスにする
+[ -d "$target" ] && path=$(cd -- "$target" && pwd)
+
+enc=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$path") || die "住所を作れません"
+url="vscode://vscode-remote/ssh-remote+$host$enc"
+
+sent=0
+if [ -n "${TMUX:-}" ]; then
+  tmux set-buffer -w -- "$url" && sent=1
+else
+  { printf '\033]52;c;%s\a' "$(printf %s "$url" | base64 -w0)" > /dev/tty; } 2>/dev/null && sent=1
+fi
+
+printf '\n  %s\n\n' "$path"
+printf '  \033]8;;%s\033\\%s\033]8;;\033\\\n\n' "$url" "$url"
+if [ "$sent" = 1 ]; then
+  echo "  クリップボードに入れました。手元のブラウザのアドレス欄に貼ると、VS Code で開きます。"
+else
+  echo "  クリップボードへは送れませんでした。上の住所を手で写してください。"
+fi
+echo "  （Host 名が違うときは、このマシンの ~/.bashrc.local に export VSOPEN_HOST=<Host名>）"
+echo
+read -n1 -s -r -p "  何かキーを押すと閉じます"
+exit 0

@@ -12,6 +12,7 @@ tmux・Neovim（LazyVim）・ターミナル用の小さなツール群の設定
 | `bin/inbox` | 1行メモを `~/inbox.md` に追記する |
 | `bin/tmtop` | tmux のセッションごとのメモリ使用量を出す |
 | `bin/mdopen` | 環境に合わせて URL を開く（WSL・デスクトップ・SSH 先） |
+| `bin/vsopen` | SSH 先のフォルダを、手元の VS Code（Remote-SSH）で開く住所を作って、手元のクリップボードへ送る |
 
 ## 使い始める: SSH 先のサーバに入れて、手元のブラウザで Markdown を見る
 
@@ -152,6 +153,7 @@ tmux の中で `Ctrl-Space` を押して離し、続けて `m` を押します�
 | `g` | how: Linux・tmux の使い方を聞く |
 | `i` | inbox: 1行メモを `~/inbox.md` に追記 |
 | `y` | approvals: エージェントの承認待ちを全ペインから集めて答える |
+| `v` | vsopen: 今のフォルダを手元の VS Code（Remote-SSH）で開くための住所を、手元のクリップボードへ送る（SSH 先で使う） |
 | `e` | 今のフォルダをエクスプローラで開く（WSL のときだけ） |
 | `\|` / `-` | 左右 / 上下に分割 |
 | `h` `j` `k` `l` | ペイン移動（Prefix なしの `Ctrl-h/j/k/l` でも nvim とまたいで移動できる） |
@@ -203,6 +205,24 @@ mdview は最後に `mdopen` で URL を開きます。環境で動きが変わ�
 | SSH 先 | URL を OSC 52 でクリップボードへ送り、画面にも出してキー待ち |
 
 Windows Terminal のリンクは `Ctrl+クリック` で開きますが、tmux のマウス有効中はクリックを tmux が取るので届かないことがあります。クリップボードに貼るのが確実です。
+
+## サーバのフォルダを手元の VS Code で開く（vsopen）
+
+SSH 先のプロジェクトを、コピーせずに、手元の VS Code で開きます。ファイルはサーバに置いたままで、VS Code がサーバへ見に行きます（Remote-SSH）。巨大なプロジェクトでも、そのまま開けます。Markdown を何枚も開いて見るときにも向いています。
+
+1. サーバの tmux で、開きたいフォルダに移って `Prefix + v` を押す。
+2. `vscode://vscode-remote/ssh-remote+<Host名>/<パス>` という住所が、手元のクリップボードに入る。
+3. 手元のブラウザのアドレス欄に貼って Enter。「Visual Studio Code を開きますか？」に答えると、VS Code でフォルダが開く。
+
+ファイルを指定して開く（サーバの端末で `vsopen path/to/file.md`）こともできます。
+
+用意するもの（手元）:
+
+- Windows の VS Code と、拡張 **Remote - SSH**。
+- **Windows 側の ssh の設定**（`%UserProfile%\.ssh\config`）に、サーバの `Host` があること。VS Code は WSL の `~/.ssh/config` を読みません。
+- サーバの `hostname -s` と Host 名が違うときは、サーバの `~/.bashrc.local` に `export VSOPEN_HOST=<Host名>` と書く。
+
+サーバには、初回の接続で VS Code のサーバプログラム（`~/.vscode-server`）が入ります。会社の PC やサーバでは、VS Code・拡張・`vscode://` の住所を開くことが許されているか、先に確かめてください。
 
 ## how
 
