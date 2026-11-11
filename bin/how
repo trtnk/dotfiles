@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# how [質問]  Linux と tmux の使い方を短く聞く。引数なしなら入力を求める（tmux のポップアップ用）
+# 答える相手は ~/.config/how/config で選ぶ（例: dotfiles の how/config.example）
+#   HOW_BACKEND   claude（claude -p）| openai（OpenAI 互換サーバ: llama-server・ollama 等）
+#                 未設定なら claude コマンドがあれば claude、なければ openai
+#   HOW_BASE_URL  openai のとき。既定 http://127.0.0.1:8080/v1（llama-server の既定）
+#   HOW_MODEL     openai のときのモデル名。llama-server は読み込み中のモデルを使うので何でもよい
+#   HOW_API_KEY   要るサーバだけ
+#   HOW_CLAUDE_MODEL  claude のときのモデル。既定 haiku
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/how/config"
+[ -f "$conf" ] && . "$conf"
+
+popup=0
+if [ $# -gt 0 ]; then
+  q="$*"
+else
+  popup=1
+  read -e -r -p "how> " q
+fi
+[ -z "$q" ] && exit 0
+
+binds=$(grep -h '^bind' ~/.tmux.conf 2>/dev/null)
+prompt="Linuxとtmuxの使い方の質問に日本語で答えて。最初にコマンドやキー操作を示し、説明は3行以内。ファイルの読み書きやコマンド実行はしない。
+ユーザーが独自に登録したtmuxのキー:
+$binds
+質問: $q"
+
+backend=${HOW_BACKEND:-}
+if [ -z "$backend" ]; then
+  if command -v claude >/dev/null; then backend=claude; else backend=openai; fi
+fi
+
+case "$backend" in
+  claude)
+    cd ~ || exit 1
+    claude -p --model "${HOW_CLAUDE_MODEL:-haiku}" "$prompt"
+    ;;
+  openai)
+    HOW_PROMPT="$prompt" python3 - <<'PY'
+import json, os, sys, urllib.request, urllib.error
+base = os.environ.get("HOW_BASE_URL", "http://127.0.0.1:8080/v1").rstrip("/")
+body = {
+    "model": os.environ.get("HOW_MODEL", "local"),
+    "messages": [{"role": "user", "content": os.environ["HOW_PROMPT"]}],
+    "stream": True,
+}
+headers = {"Content-Type": "application/json"}
+if os.environ.get("HOW_API_KEY"):
+    headers["Authorization"] = "Bearer " + os.environ["HOW_API_KEY"]
+req = urllib.request.Request(base + "/chat/completions", json.dumps(body).encode(), headers)
+try:
+    with urllib.request.urlopen(req, timeout=120) as r:
+        for line in r:
+            line = line.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            for c in json.loads(data).get("choices", []):
+                sys.stdout.write((c.get("delta") or {}).get("content") or "")
+                sys.stdout.flush()
+    print()
+except (urllib.error.URLError, OSError) as e:
+    print(f"how: {base} に繋がりません（{e}）。サーバは起きていますか。SSH 先なら RemoteForward は張ってありますか", file=sys.stderr)
+    sys.exit(1)
+PY
+    ;;
+  *)
+    echo "how: HOW_BACKEND は claude か openai: $backend" >&2
+    exit 1
+    ;;
+esac
+
+if [ "$popup" = 1 ]; then
+  echo
+  read -n1 -s -r -p "(何かキーを押すと閉じます)"
+fi

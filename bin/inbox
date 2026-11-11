@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+f="$HOME/inbox.md"
+if [ $# -gt 0 ]; then
+  text="$*"
+else
+  read -e -r -p "inbox> " text
+fi
+[ -z "$text" ] && exit 0
+printf -- '- %s %s\n' "$(date '+%Y-%m-%d %H:%M')" "$text" >> "$f"

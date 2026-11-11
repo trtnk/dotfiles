@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# mdview [-t] [dir]  Markdown を新しい順に選び（fzf + glow のプレビュー）、ブラウザで見る
+#   -t           ブラウザを使わず、ターミナルの中で全画面表示する（glow のページャ）
+#   MDVIEW_PORT  mdserve のポート。既定は手元 3000・SSH 先 3001
+#                SSH 先で使うときは、手元の ~/.ssh/config に LocalForward 3001 localhost:3001
+term=0
+if [ "${1:-}" = "-t" ]; then term=1; shift; fi
+cd "${1:-$PWD}" || exit 1
+
+if [ -n "${SSH_CONNECTION:-}" ]; then port=${MDVIEW_PORT:-3001}; else port=${MDVIEW_PORT:-3000}; fi
+
+file=$(rg --files --no-ignore -g '*.md' 2>/dev/null \
+  | xargs -r -d '\n' stat -c '%Y %n' 2>/dev/null | sort -rn | cut -d' ' -f2- \
+  | fzf --prompt='md> ' \
+    --preview 'glow -s dark -w "$FZF_PREVIEW_COLUMNS" {}' \
+    --preview-window=right:65%) || exit 0
+
+if [ "$term" = 1 ] || ! command -v mdserve >/dev/null; then
+  exec glow -p -s dark "$file"
+fi
+
+# 前に自分が起こした mdserve だけを止める（他人のものや他のポートには触らない）
+pidfile="${XDG_RUNTIME_DIR:-/tmp}/mdview-$(id -u)-$port.pid"
+if [ -f "$pidfile" ]; then
+  kill "$(cat "$pidfile")" 2>/dev/null
+  sleep 0.2
+fi
+setsid nohup mdserve "$file" --port "$port" >/dev/null 2>&1 &
+echo $! > "$pidfile"
+
+# 待ち受けが始まるまで待つ（最長 3 秒）
+for _ in $(seq 30); do
+  (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && break
+  sleep 0.1
+done
+
+exec mdopen "http://localhost:$port"

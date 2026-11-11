@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# mdopen URL  環境に合わせて URL を開く
+#   WSL                      → Windows の既定ブラウザ
+#   Linux デスクトップ       → xdg-open
+#   SSH 先（ブラウザがない） → 手元のクリップボードへ送り、URL を表示して待つ
+url=$1
+
+if [ -z "${SSH_CONNECTION:-}" ]; then
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    /mnt/c/Windows/explorer.exe "$url" >/dev/null 2>&1
+    exit 0
+  fi
+  if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null; then
+    xdg-open "$url" >/dev/null 2>&1 &
+    exit 0
+  fi
+fi
+
+# OSC 52 で手元のクリップボードへ。tmux の中なら tmux に任せる（set-clipboard on で外へ通る）
+if [ -n "${TMUX:-}" ]; then
+  tmux set-buffer -w -- "$url"
+else
+  printf '\033]52;c;%s\a' "$(printf %s "$url" | base64 -w0)" > /dev/tty
+fi
+
+# 本命はクリップボード。リンクはおまけ（Windows Terminal は Ctrl+クリックで開く。
+# tmux の mouse on 中はクリックを tmux が取るので、Ctrl+Shift+クリックでないと届かないことがある）
+printf '\n  \033]8;;%s\033\\%s\033]8;;\033\\\n\n' "$url" "$url"
+echo "  クリップボードに入れました。手元のブラウザのアドレス欄に貼ってください。"
+echo "  （手元の ~/.ssh/config に LocalForward が要ります。dotfiles の ssh/config.example）"
+echo
+read -n1 -s -r -p "  何かキーを押すと閉じます（表示は裏で続きます）"

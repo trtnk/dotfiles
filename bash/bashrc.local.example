@@ -1,0 +1,6 @@
+# ~/.bashrc.local の見本。このマシンだけの設定・個人の値はここへ（git に入れない）
+#
+# 例:
+# export NODE_OPTIONS="--max-old-space-size=2048"
+# alias wake-sub='wakeonlan 00:00:00:00:00:00'
+# alias sleep-sub='ssh user@host "…"'

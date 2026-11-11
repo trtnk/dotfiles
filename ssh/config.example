@@ -1,0 +1,12 @@
+# 手元の ~/.ssh/config に足す例（git に入れるのはこの見本だけ。本物のホスト名は書かない）
+#
+#   LocalForward  3001  … SSH 先の mdview（mdserve）を手元のブラウザで見る
+#   RemoteForward 18080 … 手元の llama-server（8080）を SSH 先の how から使う
+#                         SSH 先でよく使われる 8080 と取り合わないよう、向こう側は 18080 にする
+
+Host myserver
+    HostName server.example.com
+    User me
+    LocalForward 3001 localhost:3001
+    RemoteForward 18080 localhost:8080
+    ExitOnForwardFailure no

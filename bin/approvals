@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# approvals: tmux の全ペインから「承認待ち」の画面を探し、1枚の画面で答える。
+#   approvals          操作画面を開く。Prefix + y から呼ぶ
+#   approvals --list   承認待ちのペインを「ペインID<TAB>表示名」で出す
+#   approvals --count  件数をステータスバー向けに出す（0件なら何も出さない）
+#
+# 操作画面のキー:
+#   ← →  承認待ちのセッションを切り替える
+#   ↑ ↓  そのエージェントの選択肢を動かす（矢印キーをそのまま送る）
+#   Enter 確定   Esc 断る   1〜9 番号で選ぶ
+#   g そのペインへ飛ぶ   a 承認待ちだけ／全ペイン の切り替え   q 閉じる
+#
+# 判定は画面末尾（空行を除いた $APPROVALS_TAIL 行）だけを見る。履歴まで見ると、
+# 会話に出てきた文言で誤検出する。文言を足すときは ~/.config/approvals/patterns に1行1つ
+# （grep -E の正規表現・大文字小文字を区別しない）。
+
+tail_lines=${APPROVALS_TAIL:-12}
+extra="${XDG_CONFIG_HOME:-$HOME/.config}/approvals/patterns"
+
+# 既定の文言（Claude Code・Codex・Copilot CLI などの承認画面）
+patterns='Do you want to (proceed|make|run|create|allow|use)
+Would you like to (run|make|apply|allow)
+^[[:space:]]*(❯|›|>)[[:space:]]*1\.[[:space:]]*(Yes|Allow|Approve)
+Allow (once|always)
+\[y/N\]|\[Y/n\]|\(y/n\)'
+
+pattern_file=$(mktemp)
+cleanup() { rm -f "$pattern_file"; }
+trap cleanup EXIT
+printf '%s\n' "$patterns" > "$pattern_file"
+[ -f "$extra" ] && grep -v '^[[:space:]]*\(#\|$\)' "$extra" >> "$pattern_file"
+
+fmt='#{pane_id}	#{session_name}:#{window_index}.#{pane_index}  #{window_name}  #{pane_title}'
+
+waiting() {  # $1 = ペインID。画面末尾に承認の文言があれば真
+  tmux capture-pane -p -t "$1" 2>/dev/null |
+    grep -v '^[[:space:]]*$' | tail -n "$tail_lines" |
+    grep -qiEf "$pattern_file"
+}
+
+list() {
+  tmux list-panes -a -F "$fmt" |
+  while IFS=$'\t' read -r id name; do
+    waiting "$id" && printf '%s\t%s\n' "$id" "$name"
+  done
+}
+
+case "$1" in
+  --list)  list; exit 0 ;;
+  --count) n=$(list | wc -l); [ "$n" -gt 0 ] && printf '承認待ち %s | ' "$n"; exit 0 ;;
+esac
+
+# ---------- 操作画面 ----------
+show_all=0   # 1 なら全ペイン
+cur=""       # いま見ているペインID（並びが変わっても同じペインを見続ける）
+msg=""       # 直前に送ったもの
+
+send() { tmux send-keys -t "$cur" "$@"; msg="→ $cur に $* を送った"; sleep 0.3; }
+
+# 末尾の空行を落として、画面に収まる行数だけ出す（色は残す）
+body() {
+  tmux capture-pane -ep -t "$1" 2>/dev/null | awk -v h="$2" '
+    { line[NR] = $0; plain = $0; gsub(/\033\[[0-9;]*[A-Za-z]/, "", plain)
+      if (plain ~ /[^[:space:]]/) last = NR }
+    END { s = last - h + 1; if (s < 1) s = 1; for (i = s; i <= last; i++) print line[i] "\033[0m" }'
+}
+
+restore() { printf '\033[?7h\033[?25h\033[0m'; stty echo 2>/dev/null; }
+trap 'restore; cleanup' EXIT
+printf '\033[?7l\033[?25l'   # 折り返し無し・カーソル非表示
+
+while :; do
+  if [ "$show_all" = 1 ]; then
+    mapfile -t rows < <(tmux list-panes -a -F "$fmt")
+  else
+    mapfile -t rows < <(list)
+  fi
+  n=${#rows[@]}
+  i=0
+  for k in "${!rows[@]}"; do [ "${rows[$k]%%$'\t'*}" = "$cur" ] && i=$k; done
+  [ "$n" -gt 0 ] && cur=${rows[$i]%%$'\t'*} || cur=""
+
+  lines=$(tput lines 2>/dev/null || echo 30)
+  mode=$([ "$show_all" = 1 ] && echo "全ペイン" || echo "承認待ち")
+  printf '\033[H\033[2J'
+  if [ "$n" -eq 0 ]; then
+    printf '\033[1m%s は 0 件\033[0m\n\n' "$mode"
+    printf '  拾えていないエージェントがあれば  a  で全ペインを見られる。\n'
+    printf '  その承認画面の特徴的な1行を ~/.config/approvals/patterns に足すと拾えるようになる。\n'
+  else
+    printf '\033[7m %s [%d/%d] %s \033[0m\n' "$mode" $((i + 1)) "$n" "${rows[$i]#*$'\t'}"
+    body "$cur" $((lines - 3))
+  fi
+  printf '\033[%d;1H\033[2K\033[36m←→ 切替  ↑↓ 選択肢  Enter 確定  Esc 断る  1-9 番号  g 飛ぶ  a %s  q 閉じる\033[0m' \
+    $((lines - 1)) "$([ "$show_all" = 1 ] && echo 承認待ちだけ || echo 全ペイン)"
+  printf '\033[%d;1H\033[2K%s' "$lines" "$msg"
+
+  IFS= read -rsn1 -t 1 key; rc=$?
+  if [ $rc -ne 0 ]; then
+    [ $rc -gt 128 ] && continue   # 時間切れ → 画面を作り直す
+    exit 0                        # 入力が閉じた
+  fi
+  msg=""
+  if [ "$key" = $'\033' ]; then
+    IFS= read -rsn2 -t 0.05 rest
+    case "$rest" in
+      '[A') key=UP ;; '[B') key=DOWN ;; '[C') key=RIGHT ;; '[D') key=LEFT ;; *) key=ESC ;;
+    esac
+  fi
+  case "$key" in
+    q|Q)   exit 0 ;;
+    a|A)   show_all=$((1 - show_all)) ;;
+    RIGHT) [ "$n" -gt 0 ] && cur=${rows[$(((i + 1) % n))]%%$'\t'*} ;;
+    LEFT)  [ "$n" -gt 0 ] && cur=${rows[$(((i - 1 + n) % n))]%%$'\t'*} ;;
+  esac
+  [ -z "$cur" ] && continue
+  case "$key" in
+    UP)    send Up ;;
+    DOWN)  send Down ;;
+    ESC)   send Escape ;;
+    '')    send Enter ;;
+    [1-9]) send "$key" ;;
+    g|G)   tmux switch-client -t "$cur" \; select-window -t "$cur" \; select-pane -t "$cur"; exit 0 ;;
+  esac
+done

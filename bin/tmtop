@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# tmtop        タブ別の集計（メモリ＝実メモリ＋スワップ）
+# tmtop -p     重いプロセス上位20件
+# tmtop --log  集計を ~/.cache/tmtop.log に1回追記
+mode=sess
+case "$1" in -p) mode=proc ;; --log) mode=log ;; esac
+out=$({
+  tmux list-panes -a -F 'P #{pane_pid} #{session_name}:#{window_index} #{window_name}' 2>/dev/null
+  ps -eo pid=,ppid=,rss=,comm= | sed 's/^/X /'
+  awk '/^Pid:/{p=$2} /^VmSwap:/{print "S", p, $2}' /proc/[0-9]*/status 2>/dev/null
+  top -b -n2 -d1 | awk '/^ *PID/{f++; next} f==2 && $1 ~ /^[0-9]+$/ {print "C", $1, $9}'
+} | awk -v mode="$mode" '
+  $1=="P" { pid=$2; sub(/^P [0-9]+ /,""); root[pid]=$0; next }
+  $1=="X" { ppid[$2]=$3; rss[$2]=$4; name[$2]=$5; next }
+  $1=="S" { sw[$2]=$3; next }
+  $1=="C" { cpu[$2]=$3; next }
+  END {
+    for (p in ppid) {
+      q=p; s="(tmux外)"
+      for (n=0; n<64; n++) {
+        if (q in root) { s=root[q]; break }
+        if (!(q in ppid)) break
+        q=ppid[q]
+      }
+      m=rss[p]+sw[p]
+      if (mode=="proc") { printf "%.0f\t%.0f\t%.1f\t%s\t%s\t%s\n", m/1024, sw[p]/1024, cpu[p], s, p, name[p]; continue }
+      mem[s]+=m; swp[s]+=sw[p]; c[s]+=cpu[p]
+      if (m>top[s]) { top[s]=m; tn[s]=name[p] }
+    }
+    if (mode!="proc") for (s in mem) printf "%.0f\t%.0f\t%.1f\t%s\t%s\n", mem[s]/1024, swp[s]/1024, c[s], s, tn[s]
+  }' | sort -rn)
+total=$(awk '/^MemTotal/{t=$2} /^MemAvailable/{a=$2} /^SwapTotal/{st=$2} /^SwapFree/{sf=$2}
+  END {printf "全体: 空き %.1fGB / %.1fGB、スワップ使用 %.1fGB", a/1048576, t/1048576, (st-sf)/1048576}' /proc/meminfo)
+case "$mode" in
+  sess) { printf 'MEM(MB)\tうちSWAP\tCPU%%\tタブ\t最大プロセス\n'; echo "$out"; } | column -t -s $'\t'; echo "$total" ;;
+  proc) { printf 'MEM(MB)\tうちSWAP\tCPU%%\tタブ\tPID\tプロセス\n'; echo "$out" | head -20; } | column -t -s $'\t'; echo "$total" ;;
+  log)
+    mkdir -p ~/.cache
+    ts=$(date '+%F %T')
+    echo "$out" | sed "s/^/$ts\t/" >> ~/.cache/tmtop.log
+    [ "$(wc -l < ~/.cache/tmtop.log)" -gt 100000 ] && tail -n 50000 ~/.cache/tmtop.log > ~/.cache/tmtop.log.tmp && mv ~/.cache/tmtop.log.tmp ~/.cache/tmtop.log
+    ;;
+esac
+exit 0

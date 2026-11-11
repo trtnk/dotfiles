@@ -1,0 +1,13 @@
+# how の設定。~/.config/how/config に写して使う（git に入れない）
+
+# --- 手元（llama-server を同じマシンで動かしている） ---
+# HOW_BACKEND=openai
+# HOW_BASE_URL=http://127.0.0.1:8080/v1
+
+# --- SSH 先（手元の llama-server を RemoteForward で借りる。ssh/config.example 参照） ---
+# HOW_BACKEND=openai
+# HOW_BASE_URL=http://127.0.0.1:18080/v1
+
+# --- Claude を使う ---
+# HOW_BACKEND=claude
+# HOW_CLAUDE_MODEL=haiku
