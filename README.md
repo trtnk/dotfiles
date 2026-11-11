@@ -41,7 +41,16 @@ git clone https://github.com/trtnk/dotfiles ~/dotfiles
 2. tmux を起動し、`Prefix + I`（大文字の i）でプラグインを入れる
 3. `nvim` を一度起動する（LazyVim がプラグインを入れる）
 
-必要なコマンド: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。`mdserve` は任意で、ないと mdview はターミナル内表示になります。
+必要なコマンド: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。`mdserve` は、mdview でブラウザ表示をするときに要ります（ないとターミナル内表示になります）。
+
+Ubuntu / Debian なら、まとめて入れられます。
+
+```bash
+sudo apt install tmux neovim ripgrep fzf glow cargo
+cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
+```
+
+`glow` が apt にない版のディストリビューションでは、[配布ページ](https://github.com/charmbracelet/glow/releases) から入れます。
 
 ## tmux のキー（Prefix = Ctrl-Space）
 
