@@ -38,6 +38,8 @@ if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
   git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
 fi
 
+# 古いシェルでは PATH が通っていないので、確認の間だけ足す（cargo install したものを拾う）
+PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
 missing=()
 for c in tmux nvim git rg fzf glow mdserve python3; do
   command -v "$c" >/dev/null || missing+=("$c")
@@ -45,10 +47,10 @@ done
 if [ ${#missing[@]} -gt 0 ]; then
   echo
   echo "足りないコマンド: ${missing[*]}"
-  echo "  apt: sudo apt install tmux git ripgrep fzf python3"
-  echo "  nvim: https://github.com/neovim/neovim/releases（0.10 以上）"
-  echo "  glow: https://github.com/charmbracelet/glow/releases"
-  echo "  mdserve: cargo install mdserve（なくても mdview は glow で表示する）"
+  echo "  Ubuntu / Debian: sudo apt install tmux git neovim ripgrep fzf glow cargo python3"
+  echo "  nvim が 0.10 より古い: https://github.com/neovim/neovim/releases"
+  echo "  glow が apt にない: https://github.com/charmbracelet/glow/releases"
+  echo "  mdserve: cargo install mdserve（ブラウザ表示用。なくても mdview は glow で表示する）"
 fi
 echo
 echo "済み。新しいシェルを開き、tmux の中で Prefix + I でプラグインを入れる"

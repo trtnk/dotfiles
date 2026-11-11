@@ -13,7 +13,29 @@ tmux・Neovim（LazyVim）・ターミナル用の小さなツール群の設定
 | `bin/tmtop` | tmux のセッションごとのメモリ使用量を出す |
 | `bin/mdopen` | 環境に合わせて URL を開く（WSL・デスクトップ・SSH 先） |
 
-## 入れる
+## 使い始める: SSH 先のサーバに入れて、手元のブラウザで Markdown を見る
+
+想定する形:
+
+- **手元**: SSH を打つ側のマシン。Windows の WSL、Linux、Mac のどれでもよい。ブラウザはこのマシンのもの。
+- **サーバ**: SSH 先の Ubuntu / Debian。作業は、サーバの tmux の中で行う。
+
+手順の見出しに、どちらのマシンで打つかを書いてあります。
+
+### 1. サーバ: 必要なコマンドを入れる
+
+```bash
+sudo apt update
+sudo apt install tmux neovim ripgrep fzf glow cargo
+cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
+```
+
+- 必要なもの: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。
+- `mdserve` は、ブラウザで見るときだけ要ります。ないと mdview はターミナル内表示になります。
+- `glow` が apt にない版のディストリビューションでは、[配布ページ](https://github.com/charmbracelet/glow/releases) から入れます。
+- `sudo` が使えないときは、各コマンドの配布物をホーム配下に置いて、PATH を通します。
+
+### 2. サーバ: dotfiles を入れる
 
 ```bash
 git clone https://github.com/trtnk/dotfiles ~/dotfiles
@@ -25,7 +47,7 @@ git clone https://github.com/trtnk/dotfiles ~/dotfiles
 - 既にあるファイルは、リポジトリ内の `.backup/<時刻>/` に退避します（git には入りません）。
 - `~/.bashrc` は書き換えず、最後に1行足します。
 - 何度走らせても同じ結果になります。
-- 最後に、足りないコマンドの一覧と入れ方を出します。
+- 最後に、足りないコマンドの一覧を出します。**空なら 1 は済んでいます。**
 
 | リポジトリ | 張る先 |
 |---|---|
@@ -35,22 +57,91 @@ git clone https://github.com/trtnk/dotfiles ~/dotfiles
 | `bin/*` | `~/.local/bin/` |
 | `bash/init.sh` | `~/.bashrc` の最後から読む |
 
-入れたあと:
+### 3. 手元: ブラウザへの転送を足す
 
-1. 新しいシェルを開く
-2. tmux を起動し、`Prefix + I`（大文字の i）でプラグインを入れる
-3. `nvim` を一度起動する（LazyVim がプラグインを入れる）
+手元の `~/.ssh/config` の、サーバの `Host` の段に1行足します（見本は `ssh/config.example`）。
 
-必要なコマンド: tmux・nvim（0.10 以上）・git・rg（ripgrep）・fzf・glow・python3。`mdserve` は、mdview でブラウザ表示をするときに要ります（ないとターミナル内表示になります）。
-
-Ubuntu / Debian なら、まとめて入れられます。
-
-```bash
-sudo apt install tmux neovim ripgrep fzf glow cargo
-cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
+```
+Host myserver
+    HostName server.example.com
+    User me
+    LocalForward 3001 localhost:3001
 ```
 
-`glow` が apt にない版のディストリビューションでは、[配布ページ](https://github.com/charmbracelet/glow/releases) から入れます。
+- 段の中に、他の行と同じ深さで書きます。段の外に書くと効きません。
+- ssh の設定は行末にコメントを書けません。コメントは別の行に書きます。
+
+足したら、つなぐ前に設定が読めているかを確かめます。
+
+```bash
+ssh -G myserver | grep -i localforward
+```
+
+`localforward 3001 [localhost]:3001` と出れば通っています。何も出なければ、足した場所が段の外です。
+
+転送は**つなぐときにだけ**張られます。つないでいる SSH があれば、一度抜けて `ssh myserver` でつなぎ直します。
+
+WSL で張った転送は、既定で Windows のブラウザの `http://localhost:3001` から届きます。届かないときは、Windows 側の `%UserProfile%\.wslconfig` の `[wsl2]` 節で `localhostForwarding=true`（または `networkingMode=mirrored`）になっているかを見ます。
+
+### 4. サーバ: tmux を起動してプラグインを入れる
+
+つなぎ直したシェルで、まず PATH を確かめます（`install.sh` が足した設定は、新しいシェルから効きます）。
+
+```bash
+command -v mdserve tmux glow fzf rg
+```
+
+5 つとも、パスが 1 行ずつ出れば成功です。
+
+```bash
+tmux
+```
+
+tmux の中で `Ctrl-Space` を押して離し、続けて大文字の `I`（`Shift + i`）を押すと、プラグインが入ります。
+
+### 5. Markdown を見る
+
+試す Markdown を作ります。
+
+```bash
+echo '# テスト' > ~/test.md
+```
+
+tmux の中で `Ctrl-Space` を押して離し、続けて `m` を押します。
+
+1. Markdown の一覧が出る（新しい順・右にプレビュー）。`test.md` を選んで Enter。
+2. サーバが URL を OSC 52 で**手元のクリップボードへ送り**、画面にも出してキー待ちになる。
+3. 手元のブラウザのアドレス欄に貼る（`http://localhost:3001`）。表示されれば成功。
+4. サーバで `test.md` を保存し直すと、ブラウザが自動で再読み込みする。
+
+ブラウザなしでターミナルの中に出すなら `Ctrl-Space` → `M`（大文字）です。
+
+### うまくいかないとき
+
+| 症状 | 見るところ |
+|---|---|
+| `install.sh` が `mdserve` を足りないと言う | 古いシェルで PATH が通っていないだけのことがある。新しいシェルで `command -v mdserve` |
+| `cargo install` のあと `~/.cargo/bin` の PATH の警告が出る | 新しいシェル（つなぎ直し）で解消する。`bash/init.sh` が自動で足す |
+| ブラウザが開かない・接続できない | 3 の転送を足したあと、つなぎ直したか。`ssh -G` で設定が読めているか |
+| クリップボードに URL が入らない | 手元のターミナルが OSC 52 に対応しているか。画面に出た URL を手で打ってもよい |
+| `Ctrl-Space` に反応しない | 手元の日本語入力などが、そのキーを先に取っていないか |
+| プラグインが入らない（`Prefix + I`） | tmux の中で押したか。大文字の `I` か。`~/.tmux/plugins/tpm` があるか |
+
+## 手元だけで使う（SSH しない）
+
+同じ手順の 1・2・4・5 だけで動きます。3 は要りません。mdview はポート 3000 で、ブラウザを直接開きます（WSL なら Windows の既定ブラウザ）。
+
+## 手元とサーバの両方に入れる
+
+同じリポジトリを両方で clone し、それぞれで `install.sh` を走らせます。設定ファイルは共通で、動きはそのマシンが WSL か・SSH 先かを見て変わります。
+
+| | 手元 | SSH 先 |
+|---|---|---|
+| mdview | ポート 3000。ブラウザを直接開く | ポート 3001。URL をクリップボードへ送る |
+| `Prefix + e` | WSL のときだけ使える | 出ない |
+| ステータスバー | ホスト名なし | ホスト名を出す |
+
+手元でも tmux を起動してその中で ssh すると、入れ子になります。手元の tmux で `F12` を押すと手元の tmux が眠り、キーが全部サーバへ届きます。もう一度 `F12` で戻ります。眠っている間は、手元のステータスバーに `[OFF]` が出ます。
 
 ## tmux のキー（Prefix = Ctrl-Space）
 
@@ -65,7 +156,9 @@ cargo install mdserve    # ブラウザ表示用。ビルドに数分かかる
 | `\|` / `-` | 左右 / 上下に分割 |
 | `h` `j` `k` `l` | ペイン移動（Prefix なしの `Ctrl-h/j/k/l` でも nvim とまたいで移動できる） |
 | `r` | 設定の再読み込み |
-| `F12`（Prefix なし） | 入れ子の tmux のとき、外側の tmux を眠らせる（もう一度で戻る） |
+| `F12`（Prefix なし） | 入れ子のとき、外側の tmux を眠らせる（もう一度で戻る） |
+
+ポップアップ（`m`・`g`・`i`・`y`）は、押した tmux のあるマシンで動きます。サーバの tmux で押せば、サーバで動きます。
 
 ## approvals
 
@@ -99,11 +192,9 @@ Claude Code・Codex・Copilot CLI・Antigravity などを tmux の多数のペ�
 
 確かめ方: 承認待ちを出した状態で `approvals --list` を打つと、`ペインID<TAB>名前` が1行ずつ出ます。
 
-## mdview と mdopen
+## mdopen のふるまい
 
-`mdview` は fzf で Markdown を選び（右に glow のプレビュー）、`mdserve` で配信してブラウザで開きます。`-t` を付けるか `mdserve` がなければ、glow のページャでターミナル内に表示します。
-
-最後の「開く」は `mdopen` が環境に合わせて行います。
+mdview は最後に `mdopen` で URL を開きます。環境で動きが変わります。
 
 | 環境 | 動き |
 |---|---|
@@ -111,22 +202,7 @@ Claude Code・Codex・Copilot CLI・Antigravity などを tmux の多数のペ�
 | Linux デスクトップ | `xdg-open` |
 | SSH 先 | URL を OSC 52 でクリップボードへ送り、画面にも出してキー待ち |
 
-## SSH 先で使う
-
-SSH 先にも同じ手順で入れられます。SSH 先では次のように動きます。
-
-- ステータスバーにホスト名が出る。
-- mdview のポートは 3001（手元は 3000）。
-- tmux のコピーは OSC 52 で手元のクリップボードへ届く。
-
-mdview の画面を手元のブラウザで見るには、手元の `~/.ssh/config` に転送を足します（見本は `ssh/config.example`）。
-
-```
-Host myserver
-    LocalForward 3001 localhost:3001
-```
-
-足したら SSH をつなぎ直します。
+Windows Terminal のリンクは `Ctrl+クリック` で開きますが、tmux のマウス有効中はクリックを tmux が取るので届かないことがあります。クリップボードに貼るのが確実です。
 
 ## how
 
@@ -145,7 +221,7 @@ Host myserver
 
 | 変数 | 既定 | 意味 |
 |---|---|---|
-| `MDVIEW_PORT` | 3000（SSH 先は 3001） | mdserve のポート |
+| `MDVIEW_PORT` | 3000（SSH 先は 3001） | mdserve のポート。変えたら 3 の `LocalForward` も合わせる |
 | `APPROVALS_TAIL` | 12 | approvals が各ペインの末尾から見る行数 |
 | `HOW_BACKEND` | claude があれば claude、なければ openai | how の相手 |
 | `HOW_BASE_URL` | `http://127.0.0.1:8080/v1` | OpenAI 互換サーバ |
